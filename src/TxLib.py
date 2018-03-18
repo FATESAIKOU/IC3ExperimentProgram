@@ -15,7 +15,7 @@ from iota import Iota, TryteString, Tag, Address
 from iota import Transaction, ProposedTransaction
 from iota import ProposedBundle
 
-from iota.cryto.signing import KeyGenerator
+from iota.crypto.signing import KeyGenerator
 
 
 MY_KEY = 'DFHKERITBIESCMCGKCMKY9QGASSATEQODUPHGZZVONSOTJGCYM9TAUL9ARMYYEMSGNDQUUY9YQYYAZKKE'
@@ -28,9 +28,9 @@ class TxHandler:
         self.tx_buffer = []
        
         self.cloud_key = cloud_key
-        self.cache_mode = self.cache_mode
+        self.cache_mode = cache_mode
         self.buffer_count = 0
-        self.buffer_size = self.buffer_size
+        self.buffer_size = buffer_size
 
         self.iota_api = Iota(iota_node_addr)
 
@@ -60,18 +60,18 @@ class TxHandler:
     def registPermission(self, device_key, accessor_key, s_time, e_time):
         tx_data = {
             'device_key': device_key,
-            'access_key': accessor_key,
+            'accessor_key': accessor_key,
             'cloud_key': self.cloud_key,
             's_time': s_time,
             'e_time': e_time
         }
 
-        if self.buffer_count + 1 < self.buffer_size:
-            self.tx_buffer.append(tx_data)
-            self.tx_cache.append(tx_data)
-            self.buffer_count += 1
-        else:
-            self.__syncTransactions__(
+        self.tx_buffer.append(tx_data)
+        self.tx_cache.append(tx_data)
+        self.buffer_count += 1
+
+        if not (self.buffer_count < self.buffer_size):
+            self.__syncTransaction__(
                 self.__createBundle__(self.tx_buffer)
             )
             self.tx_buffer = []
@@ -101,7 +101,7 @@ class TxHandler:
         self.tx_cache.extend(tx_datas)
 
         for tx_data in tx_datas:
-            if tx_data.accessor_key == accessor_key:
+            if tx_data['accessor_key'] == accessor_key:
                 return True
 
         return False
@@ -112,10 +112,13 @@ class TxHandler:
     """
     def __getTxWithTag__(self, device_key, cloud_key):
         tx_hashes = self.iota_api.find_transactions(tags=[
-            device_key[:14] + cloud_key[:13]
+            unicode(device_key[:14] + cloud_key[:13])
         ])['hashes']
 
-        tx_tryte_list = self.iota_api.get_trytes(hashes=tx_hashes)
+        if not (len(tx_hashes) > 0):
+            return []
+
+        tx_tryte_list = self.iota_api.get_trytes(hashes=tx_hashes)['trytes']
 
         return tx_tryte_list
 
@@ -124,7 +127,7 @@ class TxHandler:
         tx_contains = [Transaction.from_tryte_string(tryte) for tryte in tx_tryte_list]
 
         tx_datas = [
-            json.loads(tx_contains.signature_message_fragment.decode())
+            json.loads(tx.signature_message_fragment.decode())
             for tx in tx_contains
         ]
         
@@ -146,8 +149,8 @@ class TxHandler:
 
 
     def __syncTransaction__(self, bundle):
-        approvee_tx = self.api.get_transactions_to_approve(depth=27)
-        result = self.api.attach_to_tangle(
+        approvee_tx = self.iota_api.get_transactions_to_approve(depth=27)
+        result = self.iota_api.attach_to_tangle(
             branch_transaction = approvee_tx['branchTransaction'],
             trunk_transaction = approvee_tx['trunkTransaction'],
             min_weight_magnitude = 18,
@@ -155,7 +158,7 @@ class TxHandler:
         )
 
         tx_tryte_list = result['trytes']
-        self.api.broadcast_and_store(trytes=tx_tryte_list)
+        self.iota_api.broadcast_and_store(trytes=tx_tryte_list)
     
 
     def __createBundle__(self, tx_datas):
