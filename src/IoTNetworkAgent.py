@@ -24,7 +24,127 @@ import asyncore
 import logging
 import socket
 import json
+import time
+import string
+import random
 
+
+def getID(length):
+    candidates = string.ascii_uppercase + '9'
+ 
+    return [random.choice(candidates) for _ in xrange(length)]
+ 
+
+def createClients(server_addr, action, fail_prop, number, right_file='./right.json'):
+    src = open(right_file, 'r')
+    valid_leases = json.loads(src.read())
+    src.close()
+
+    if action == 'get_right':
+        s_time = time.time()
+        e_time = s_time + 1
+
+        leases = [
+            {
+                'device_key': getID(81),
+                'accessor_key': getID(81),
+                's_time': s_time,
+                'e_time': e_time
+            }
+            for _ in xrange(number)
+        ]
+        
+        valid_leases.extend(leases)
+        src = open(right_file, 'w')
+        src.write(json.dumps(valid_leases))
+        src.close()
+
+        aim_leases = leases # extend?
+    elif action == 'get_access':
+        aim_leases = random.sample(valid_leases, number)
+
+    clients = [
+        IoTClient(
+            server_addr,
+            {
+                'action': action,
+                'content': lease
+            }
+        )
+        for lease in aim_leases
+    ]
+
+    return clients
+
+
+"""
+Client Side Agent
+"""
+
+class IoTClient(asyncore.dispatcher):
+    """
+    Sends messages to the server and receives responses.
+    """
+
+    def __init__(self, server_addr, message, chunk_size=256):
+        # define logger & message to send.
+        self.logger = logging.getLogger('\033[43m[Client]\033[49m')
+        self.message = message
+        self.to_send = message
+        self.logger.debug('message: %s', message)
+        self.chunk_size = chunk_size
+
+        # a space to restore the responses
+        self.received_data = []
+
+        # init socket
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.logger.debug('connecting to %s', server_addr)
+        self.connect(server_addr)
+
+        # result
+        self.status = 'pending'
+        self.delay  = 0.0
+
+
+    def handle_connect(self):
+        self.logger.debug('\033[92m[HANDLE_CONNECT]\033[37m handle_connect()')
+
+
+    def handle_close(self):
+        self.delay = self.e_time - self.s_time
+        self.logger.debug('\033[92m[HANDLE_CLOSE]\033[37m handle_close()')
+        self.close()
+
+        received_message = ''.join(self.received_data)
+        if 'ERROR' in received_message:
+            self.status = 'ERROR'
+        else:
+            self.status = 'SUCCESS'
+
+
+    def writable(self):
+        self.logger.debug('\033[94m[DETECT_WRITABLE]\033[37m writable() -> %s', len(self.to_send) > 0)
+        return len(self.to_send) > 0
+
+
+    def handle_write(self):
+        self.s_time = time.time()
+        sent_len = self.send(self.to_send[:self.chunk_size])
+        self.logger.debug('\033[93m[HANDLE_WRITE]\033[37m handle_write() -> (%d) "%s"', sent_len, self.to_send[:sent_len])
+        self.to_send = self.to_send[sent_len:]
+
+
+    def handle_read(self):
+        data = self.recv(self.chunk_size)
+        self.e_time = time.time()
+        self.logger.debug('\033[93m[HANDLE_READ]\033[37m handle_read() -> (%d) "%s"', len(data), data)
+        self.received_data.append(data)
+
+"""
+Server Side Agent
+"""
 
 class IoTServer(asyncore.dispatcher):
     """
@@ -125,26 +245,26 @@ class IoTRequestHandler(asyncore.dispatcher):
         if not self.txh.checkRegistable(
                 r_info['device_key'],
                 r_info['accessor_key'],
-                r_info['s_time'], 
-                r_info['e_time']
+                float(r_info['s_time']), 
+                float(r_info['e_time'])
             ):
-            return '[Info] Permission is not registable.'
+            return '[ERROR] Permission is not registable.'
         
         self.txh.registPermission(
             r_info['device_key'], r_info['accessor_key'],
             r_info['s_time'], r_info['e_time']
         )
 
-        return '[Info] Permission registed successfully.'
+        return '[INFO] Permission registed successfully.'
 
     
     def get_access(self, r_info):
         if self.txh.checkPermission(
                 r_info['device_key'], 
                 r_info['accessor_key'], 
-                r_info['s_time'], 
-                r_info['e_time']
+                float(r_info['s_time']), 
+                float(r_info['e_time'])
             ):
-            return '[Info] Got access successfully.'
+            return '[INFO] Got access successfully.'
         else:
-            return '[Info] Fault to get access.'
+            return '[ERROR] Fault to get access.'
