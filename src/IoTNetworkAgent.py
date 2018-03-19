@@ -18,12 +18,47 @@ and all of these would operate synchronously.
 @date   : 03/18/2018
 """
 
-#from TxLib import TxHandler
+from TxLib import TxHandler
 
 import asyncore
 import logging
-#import socket
+import socket
 import json
+
+
+class IoTServer(asyncore.dispatcher):
+    """
+    Receives connections and establishs handlers for each client
+    """
+
+    def __init__(self, iot_cloud_addr, iot_cloud_key, iota_node_addr, cache_mode, buffer_size):
+        asyncore.dispatcher.__init__(self)
+        self.logger = logging.getLogger('\033[104m[SERVER]\033[49m')
+
+        # init server
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.set_reuse_addr()
+        self.bind(iot_cloud_addr)
+        self.logger.debug('binding to %s', self.getsockname())
+        
+        # init TxHandler
+        self.txh = TxHandler(
+            iot_cloud_key, cache_mode, buffer_size, iota_node_addr
+        )
+
+        # start service
+        self.listen(1024)
+
+
+    def handle_accept(self):
+        connection = self.accept()
+        self.logger.debug('\033[92m[HANDLE_ACCEPT]\033[37m handle_accept() -> %s', connection[1])
+        IoTRequestHandler(server=self, sock=connection[0], tx_handler=self.txh)
+
+
+    def handle_close(self):
+        self.logger.debug('\033[92m[HANDLE_CLOSE]\033[37m handle_close()')
+        self.close()
 
 
 class IoTRequestHandler(asyncore.dispatcher):
