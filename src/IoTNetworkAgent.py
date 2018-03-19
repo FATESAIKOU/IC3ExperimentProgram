@@ -32,10 +32,10 @@ import random
 def getID(length):
     candidates = string.ascii_uppercase + '9'
  
-    return [random.choice(candidates) for _ in xrange(length)]
+    return ''.join([random.choice(candidates) for _ in xrange(length)])
  
 
-def createClients(server_addr, action, fail_prop, number, right_file='./right.json'):
+def createClients(server_addr_pair, action, fail_prop, number, right_file='./right.json'):
     src = open(right_file, 'r')
     valid_leases = json.loads(src.read())
     src.close()
@@ -65,11 +65,11 @@ def createClients(server_addr, action, fail_prop, number, right_file='./right.js
 
     clients = [
         IoTClient(
-            server_addr,
-            {
-                'action': action,
+            server_addr_pair,
+            json.dumps({
+                'cmd': action,
                 'content': lease
-            }
+            })
         )
         for lease in aim_leases
     ]
@@ -86,7 +86,7 @@ class IoTClient(asyncore.dispatcher):
     Sends messages to the server and receives responses.
     """
 
-    def __init__(self, server_addr, message, chunk_size=256):
+    def __init__(self, server_addr_pair, message, chunk_size=4096):
         # define logger & message to send.
         self.logger = logging.getLogger('\033[43m[Client]\033[49m')
         self.message = message
@@ -100,8 +100,8 @@ class IoTClient(asyncore.dispatcher):
         # init socket
         asyncore.dispatcher.__init__(self)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.logger.debug('connecting to %s', server_addr)
-        self.connect(server_addr)
+        self.logger.debug('connecting to %s', server_addr_pair)
+        self.connect(server_addr_pair)
 
         # result
         self.status = 'pending'
@@ -126,7 +126,7 @@ class IoTClient(asyncore.dispatcher):
 
     def writable(self):
         self.logger.debug('\033[94m[DETECT_WRITABLE]\033[37m writable() -> %s', len(self.to_send) > 0)
-        return len(self.to_send) > 0
+        return (len(self.to_send) > 0)
 
 
     def handle_write(self):
@@ -151,14 +151,14 @@ class IoTServer(asyncore.dispatcher):
     Receives connections and establishs handlers for each client
     """
 
-    def __init__(self, iot_cloud_addr, iot_cloud_key, iota_node_addr, cache_mode, buffer_size):
+    def __init__(self, server_addr_pair, iot_cloud_key, iota_node_addr, cache_mode, buffer_size):
         asyncore.dispatcher.__init__(self)
         self.logger = logging.getLogger('\033[104m[SERVER]\033[49m')
 
         # init server
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.set_reuse_addr()
-        self.bind(iot_cloud_addr)
+        self.bind(server_addr_pair)
         self.logger.debug('binding to %s', self.getsockname())
         
         # init TxHandler
@@ -186,7 +186,7 @@ class IoTRequestHandler(asyncore.dispatcher):
     Handle request message from single client
     """
 
-    def __init__(self, server, sock, tx_handler, chunk_size=256):
+    def __init__(self, server, sock, tx_handler, chunk_size=4096):
         self.server = server
         self.txh = tx_handler
         self.chunk_size = chunk_size
@@ -232,7 +232,7 @@ class IoTRequestHandler(asyncore.dispatcher):
 
         self.logger.debug('\033[93m[HANDLE_WRITE]\033[37m handle_write() -> (%d) "%s"', sent_len, response[:sent_len])
 
-        if not (self.writable):
+        if not (self.writable()):
             self.handle_close()
 
 
