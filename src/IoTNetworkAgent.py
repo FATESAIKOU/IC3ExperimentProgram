@@ -62,6 +62,8 @@ def createClients(server_addr_pair, action, fail_prop, number, right_file='./rig
         aim_leases = leases # extend?
     elif action == 'get_access':
         aim_leases = random.sample(valid_leases, number)
+    elif action == 'shutdown':
+        aim_leases = ['None']
 
     clients = [
         IoTClient(
@@ -106,6 +108,8 @@ class IoTClient(asyncore.dispatcher):
         # result
         self.status = 'pending'
         self.delay  = 0.0
+        self.s_time = 0
+        self.e_time = 0
 
 
     def handle_connect(self):
