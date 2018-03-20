@@ -80,5 +80,5 @@ if __name__ == '__main__':
     createLog(clients, LOG_PATH, ACTION)
 
     if SHUTDOWN:
-        shutdown_client = createClients((SERVER_ADDR, SERVER_PORT), 'shutdown', 0, 1)
+        shutdown_client = createClients((SERVER_ADDR, SERVER_PORT), 'shutdown', 0, 1, RIGHT_FILE)
         asyncore.loop()
