@@ -25,6 +25,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.ERROR,
                         format='%(name)s %(message)s')
 
-    createClients(('localhost', 8079), sys.argv[1], 0, 10)
+    createClients(('localhost', 8079), sys.argv[1], 0, 256)
     asyncore.loop()
 

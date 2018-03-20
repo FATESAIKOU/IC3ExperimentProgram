@@ -87,7 +87,7 @@ class TxHandler:
                 s_time,
                 e_time
             )
-            
+
             for tx_data in tx_datas:
                 if tx_data['accessor_key'] == accessor_key:
                     return True
