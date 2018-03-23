@@ -142,9 +142,11 @@ class IoTClient(asyncore.dispatcher):
 
     def handle_read(self):
         data = self.recv(self.chunk_size)
-        self.e_time = time.time()
         self.logger.debug('\033[93m[HANDLE_READ]\033[37m handle_read() -> (%d) "%s"', len(data), data)
-        self.received_data.append(data)
+        msg, e_time = data.split(':')
+        self.e_time = float(e_time)
+
+        self.received_data.append(msg)
 
 """
 Server Side Agent
@@ -223,6 +225,7 @@ class IoTRequestHandler(asyncore.dispatcher):
         else:
             data = '[ERROR] unknown command'
 
+        data += ':' + str(time.time())
         self.data_to_write.insert(0, data)
 
     
