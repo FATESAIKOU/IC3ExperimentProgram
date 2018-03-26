@@ -31,11 +31,14 @@ def genString(a, ts, cm, bs, log_path, right_path, s_addr, s_port, i_addr, shutd
         result = [
             "../src/IoTCluster.py %s %s %s %s &" %\
                 (s_port, i_addr, cm, ts + 16),
+            #"../src/Accessor.py %s 0 %s %s %s %s %s %s %s %s" %\
+            #    ('get_right', ts, cm, bs, log_path, right_path, 
+            #        s_addr, s_port, 'False'),
+            #"../src/Accessor.py %s 0 %s %s %s %s %s %s %s %s" %\
+            #    (a, ts, cm, bs, log_path, right_path, 
+            #        s_addr, s_port, shutdown),
             "../src/Accessor.py %s 0 %s %s %s %s %s %s %s %s" %\
-                ('get_right', ts, cm, bs, log_path, right_path, 
-                    s_addr, s_port, 'False'),
-            "../src/Accessor.py %s 0 %s %s %s %s %s %s %s %s" %\
-                (a, ts, cm, bs, log_path, right_path, 
+                (a, ts, cm, bs, log_path, 'right_list.json', 
                     s_addr, s_port, shutdown),
         ]
     else:
