@@ -61,7 +61,7 @@ def createClients(server_addr_pair, action, fail_prop, number, right_file='./rig
 
         aim_leases = leases # extend?
     elif action == 'get_access':
-        aim_leases = random.sample(valid_leases, number)
+        aim_leases = valid_leases[:number]
     elif action == 'shutdown':
         aim_leases = ['None']
 
@@ -134,7 +134,6 @@ class IoTClient(asyncore.dispatcher):
 
 
     def handle_write(self):
-        self.s_time = time.time()
         sent_len = self.send(self.to_send[:self.chunk_size])
         self.logger.debug('\033[93m[HANDLE_WRITE]\033[37m handle_write() -> (%d) "%s"', sent_len, self.to_send[:sent_len])
         self.to_send = self.to_send[sent_len:]
@@ -143,7 +142,8 @@ class IoTClient(asyncore.dispatcher):
     def handle_read(self):
         data = self.recv(self.chunk_size)
         self.logger.debug('\033[93m[HANDLE_READ]\033[37m handle_read() -> (%d) "%s"', len(data), data)
-        msg, e_time = data.split(':')
+        msg, s_time, e_time = data.split(':')
+        self.s_time = float(s_time)
         self.e_time = float(e_time)
 
         self.received_data.append(msg)
@@ -196,6 +196,7 @@ class IoTRequestHandler(asyncore.dispatcher):
         self.server = server
         self.txh = tx_handler
         self.chunk_size = chunk_size
+        self.s_time = time.time()
         self.logger = logging.getLogger('\033[46m[HANDLER(%s)]\033[49m' % str(sock.getsockname()))
         asyncore.dispatcher.__init__(self, sock=sock)
         self.data_to_write = []
@@ -225,7 +226,7 @@ class IoTRequestHandler(asyncore.dispatcher):
         else:
             data = '[ERROR] unknown command'
 
-        data += ':' + str(time.time())
+        data += ':%.22f:%.22f' % (self.s_time, time.time())
         self.data_to_write.insert(0, data)
 
     
